@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Тёмная тема */
+    --background: 220 30% 10%;
+    --foreground: 0 0% 98%;
+
+    --primary: 340 90% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 30% 22%;
+    --secondary-foreground: 0 0% 98%;
+
+    --border: 220 15% 20%;
+    --input: 220 15% 20%;
+    --ring: 210 10% 80%;
+
+    --radius: 0.5rem;
+  }
+
+  body {
+    @apply bg-[#101010] text-white min-h-screen font-sans;
+  }
+
+  /* Тёмный фон с градиентом + (опционально) фоновой картинкой */
+  .bg-dark-hero {
+    background: 
+      linear-gradient(
+        to bottom right,
+        rgba(15,15,15,0.9),
+        rgba(30,30,30,0.7)
+      ),
+      url("https://images.unsplash.com/photo-1607148547828-f7d6c2c5f536?auto=format&fit=crop&w=1920&q=80");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+  }
+
+  /* Стеклянный эффект для хедера и нижней плашки */
+  .glass-header {
+    backdrop-filter: blur(10px);
+    background-color: rgba(20, 20, 20, 0.5);
+  }
+
+  /* Левитация (покачивание) - 2-секундный цикл, повторяется бесконечно */
+  .levitate {
+    animation: levitate 4s ease-in-out infinite;
+  }
+
+  @keyframes levitate {
+    0% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+
+  /* Ссылки в футере и т.д. */
+  .footer-link {
+    @apply text-white/70 hover:text-white transition-colors;
+  }
+}
+
+
+@layer utilities {
+  @keyframes fadeInUp {
+    0% {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Класс-утилита, который запускает анимацию */
+  .animate-fadeInUp {
+    animation: fadeInUp 0.8s ease-out forwards;
+  }
+}

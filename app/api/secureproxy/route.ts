@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
 import https from 'https'
-import crypto from 'crypto'
 
 /**
  * Отключаем проверку SSL (CURLOPT_SSL_VERIFYPEER => false и CURLOPT_SSL_VERIFYHOST => false).
@@ -215,8 +214,14 @@ async function handleProxy(req: NextRequest, endpoint: string) {
             resHeaders['Content-Type'] = contentType
         }
 
+        // NextResponse требует статус в диапазоне 200..599. Например, 101 (Switching Protocols)
+        // вызовет RangeError. Нормализуем недопустимые статусы в 502.
+        const safeStatus = Number.isInteger(statusCode) && statusCode >= 200 && statusCode <= 599
+            ? statusCode
+            : 502
+
         return new NextResponse(responseData, {
-            status: statusCode,
+            status: safeStatus,
             headers: resHeaders,
         })
     } catch (error) {

